@@ -2,34 +2,32 @@ import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
+# ✅ Always use a writable path (important for Streamlit Cloud)
+chroma_client = chromadb.Client(
+    Settings(
+        chroma_db_impl="duckdb+parquet",
+        persist_directory="/tmp/chroma"  # Streamlit Cloud’s writable folder
+    )
+)
+
+collection = chroma_client.get_or_create_collection("pdf_chunks")
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
-chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
-collection = chroma_client.create_collection("pdf_chunks")
 
+def embed_texts(chunks):
+    return [embedder.encode(chunk).tolist() for chunk in chunks]
 
-def embed_texts(texts):
-    """"Get embeddings using ollama"""
-    return embedder.encode(texts).tolist()
-
-def chunk_text(text:str, chunk_size=1000, overlap=200):
-    """"Split long text into overlapping chunks."""
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunks.append(text[start:end])
-        start += chunk_size - overlap
-    return chunks
-
-def index_pdf_text(pdf_text: str):
-    chunks = chunk_text(pdf_text)
+def index_pdf_text(text):
+    # Split text into chunks
+    chunks = [text[i:i+1000] for i in range(0, len(text), 1000)]
     embeddings = embed_texts(chunks)
-    ids = [f"chunk_{i}" for i in range(len(chunks))]
-    collection.add(documents=chunks, embeddings=embeddings, ids=ids)
-    print(f"Indexed {len(chunks)} chunks locally.")
+    for i, emb in enumerate(embeddings):
+        collection.add(
+            ids=[str(i)],
+            embeddings=[emb],
+            documents=[chunks[i]]
+        )
 
-
-def search_similar(query:str, top_k=5):
-    query_emb = embed_texts([query])[0]
-    results = collection.query(query_embeddings=[query_emb], n_results=top_k)
-    return results["documents"][0]
+def search_similar(query, n_results=3):
+    query_emb = embedder.encode(query).tolist()
+    results = collection.query(query_embeddings=[query_emb], n_results=n_results)
+    return results.get("documents", [[]])[0]
