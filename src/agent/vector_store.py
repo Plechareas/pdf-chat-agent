@@ -1,47 +1,31 @@
-import chromadb
 from sentence_transformers import SentenceTransformer
-import streamlit as st
+import faiss
+import numpy as np
 
 # -----------------------------------------------------------------------------
-# Create and cache the resources lazily.
-# Streamlit will reuse them safely across reruns.
+# Simple FAISS-based in-memory vector store (no Chroma needed)
 # -----------------------------------------------------------------------------
+_embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-@st.cache_resource(show_spinner=False)
-def get_chroma_client():
-    # Do NOT pass Settings — just use defaults.
-    return chromadb.Client()
+_index = None
+_chunks = []
 
-@st.cache_resource(show_spinner=False)
-def get_collection():
-    client = get_chroma_client()
-    return client.get_or_create_collection("pdf_chunks")
 
-@st.cache_resource(show_spinner=False)
-def get_embedder():
-    return SentenceTransformer("all-MiniLM-L6-v2")
-
-# -----------------------------------------------------------------------------
-#  Vector-store helpers
-# -----------------------------------------------------------------------------
 def embed_texts(chunks):
-    embedder = get_embedder()
-    return [embedder.encode(chunk).tolist() for chunk in chunks]
+    return np.array([_embedder.encode(chunk) for chunk in chunks]).astype("float32")
+
 
 def index_pdf_text(text):
-    collection = get_collection()
-    chunks = [text[i:i + 1000] for i in range(0, len(text), 1000)]
-    embeddings = embed_texts(chunks)
-    for i, emb in enumerate(embeddings):
-        collection.add(
-            ids=[str(i)],
-            embeddings=[emb],
-            documents=[chunks[i]],
-        )
+    global _index, _chunks
+    _chunks = [text[i:i + 1000] for i in range(0, len(text), 1000)]
+    vectors = embed_texts(_chunks)
+    _index = faiss.IndexFlatL2(vectors.shape[1])
+    _index.add(vectors)
+
 
 def search_similar(query, n_results=3):
-    collection = get_collection()
-    embedder = get_embedder()
-    query_emb = embedder.encode(query).tolist()
-    results = collection.query(query_embeddings=[query_emb], n_results=n_results)
-    return results.get("documents", [[]])[0]
+    if _index is None or not _chunks:
+        return ["⚠️ No PDF indexed yet."]
+    q_vec = np.array([_embedder.encode(query)]).astype("float32")
+    distances, indices = _index.search(q_vec, n_results)
+    return [_chunks[i] for i in indices[0]]

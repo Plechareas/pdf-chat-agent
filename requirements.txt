@@ -3,3 +3,4 @@ chromadb
 pymupdf
 sentence-transformers
 requests
+faiss-cpu
