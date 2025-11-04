@@ -1,5 +1,5 @@
-python-dotenv
 streamlit
-pymupdf
 chromadb
-tiktoken
+pymupdf
+sentence-transformers
+requests
