@@ -3,35 +3,53 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
 # -----------------------------------------------------------------------------
-#  Make ChromaDB safe for Streamlit Cloud (only one instance at a time)
+# Global singletons
 # -----------------------------------------------------------------------------
+_chroma_client = None
+_collection = None
+_embedder = None
+
+
 def get_chroma_client():
-    """Return a single shared Chroma client."""
-    try:
-        # Reuse the existing shared instance if it exists
-        return chromadb.Client()
-    except Exception:
-        # If the above fails because of settings mismatch, clear & recreate
-        return chromadb.Client(
+    """Return a single shared Chroma client instance."""
+    global _chroma_client
+    if _chroma_client is None:
+        _chroma_client = chromadb.Client(
             Settings(
                 chroma_db_impl="duckdb+parquet",
-                persist_directory="/tmp/chroma"  # Writable path on Streamlit Cloud
+                persist_directory="/tmp/chroma"  # Safe writable path for Streamlit Cloud
             )
         )
+    return _chroma_client
 
-chroma_client = get_chroma_client()
-collection = chroma_client.get_or_create_collection("pdf_chunks")
 
-# load the embedder once
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+def get_collection():
+    """Return or create the shared Chroma collection."""
+    global _collection
+    if _collection is None:
+        client = get_chroma_client()
+        _collection = client.get_or_create_collection("pdf_chunks")
+    return _collection
+
+
+def get_embedder():
+    """Return the shared sentence transformer."""
+    global _embedder
+    if _embedder is None:
+        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedder
+
 
 # -----------------------------------------------------------------------------
 #  Vector-store helpers
 # -----------------------------------------------------------------------------
 def embed_texts(chunks):
+    embedder = get_embedder()
     return [embedder.encode(chunk).tolist() for chunk in chunks]
 
+
 def index_pdf_text(text):
+    collection = get_collection()
     chunks = [text[i:i + 1000] for i in range(0, len(text), 1000)]
     embeddings = embed_texts(chunks)
     for i, emb in enumerate(embeddings):
@@ -41,7 +59,10 @@ def index_pdf_text(text):
             documents=[chunks[i]]
         )
 
+
 def search_similar(query, n_results=3):
+    collection = get_collection()
+    embedder = get_embedder()
     query_emb = embedder.encode(query).tolist()
     results = collection.query(query_embeddings=[query_emb], n_results=n_results)
     return results.get("documents", [[]])[0]
