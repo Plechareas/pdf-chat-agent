@@ -1,4 +1,5 @@
 import streamlit as st
+import random
 from agent.pdf_loader import extract_text_from_pdf
 from agent.vector_store import index_pdf_text, search_similar
 from agent.llm_client import answer_question
@@ -15,6 +16,20 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "pending_question" not in st.session_state:
     st.session_state.pending_question = None
+if "used_questions" not in st.session_state:
+    st.session_state.used_questions = []
+
+# All possible suggestions (pool)
+ALL_SUGGESTIONS = [
+    "Can you summarize this document?",
+    "What are the main topics discussed?",
+    "List the key insights or conclusions.",
+    "Who is the author and what’s their main argument?",
+    "What are the pros and cons mentioned?",
+    "Give me a short executive summary.",
+    "What evidence or data does the author provide?",
+    "What’s the overall purpose of this document?",
+]
 
 # --- PDF Upload ---
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
@@ -38,20 +53,28 @@ if st.session_state.pdf_text:
         st.markdown(f"**Agent:** {a}")
         st.markdown("---")
 
-    # --- Recommended questions ---
+    # --- Dynamic Suggested Questions ---
     st.markdown("#### 🧠 Suggested Questions:")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("🔍 Summarize this document"):
-            st.session_state.pending_question = "Can you summarize this document?"
-    with col2:
-        if st.button("📑 What are the main topics?"):
-            st.session_state.pending_question = "What are the main topics in this document?"
-    with col3:
-        if st.button("💡 Key insights or conclusions?"):
-            st.session_state.pending_question = "What are the key insights or conclusions?"
 
-    # If the user clicked a suggestion, set it as question
+    # Filter out ones already used
+    available_suggestions = [q for q in ALL_SUGGESTIONS if q not in st.session_state.used_questions]
+
+    # Randomly pick up to 3 new ones
+    if len(available_suggestions) > 0:
+        current_suggestions = random.sample(available_suggestions, min(3, len(available_suggestions)))
+    else:
+        current_suggestions = ["No more suggestions — try your own question!"]
+
+    # Show as buttons
+    cols = st.columns(len(current_suggestions))
+    for i, col in enumerate(cols):
+        with col:
+            if st.button(f"💡 {current_suggestions[i]}"):
+                st.session_state.pending_question = current_suggestions[i]
+                st.session_state.used_questions.append(current_suggestions[i])
+                st.rerun()
+
+    # If user clicked a suggestion, use it
     if st.session_state.pending_question:
         user_question = st.session_state.pending_question
         st.session_state.pending_question = None
