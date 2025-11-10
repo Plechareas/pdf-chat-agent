@@ -2,7 +2,11 @@
 
 Chat with any PDF using AI — powered by Groq Llama 3.1 models.
 
+👉 Try it instantly on Streamlit Cloud:  
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://pdf-chat-agent-ezlibcmwk8txpxn96pyo5a.streamlit.app/)
+
+ 💡 *No installation needed — upload a PDF and start chatting right in your browser!*
+
 
 Built with Python, ChromaDB, SentenceTransformers, and Ollama.
 No API keys. No cloud dependencies. Just pure local AI magic. 🧠✨
