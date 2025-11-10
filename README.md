@@ -1,6 +1,9 @@
 📄 PDF Chat Agent
 
-Chat with any PDF — fully local and 100% free.
+Chat with any PDF using AI — powered by Groq Llama 3.1 models.
+
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://pdf-chat-agent-ezlibcmwk8txpxn96pyo5a.streamlit.app/)
+
 Built with Python, ChromaDB, SentenceTransformers, and Ollama.
 No API keys. No cloud dependencies. Just pure local AI magic. 🧠✨
 
